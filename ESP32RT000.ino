@@ -10,9 +10,6 @@
 #else   //FLAG_ORG
 #endif  //FLAG_ORG
 
-// Max clients to be connected to the chat
-#define MAX_CLIENTS 4
-
 // Include certificate data (see note above)
 #include "cert.h"
 #include "private_key.h"
@@ -25,6 +22,10 @@
 #include <SSLCert.hpp>
 #include <HTTPRequest.hpp>
 #include <HTTPResponse.hpp>
+
+
+#include "WsHandler.h"
+
 
 #if FLAG_DNS
 #include <DNSServer.h>
@@ -39,9 +40,6 @@ const char pass[] = "12345678";
 const IPAddress ip(192,168,48,1);
 const IPAddress subnet(255,255,255,0);
 #endif  //FLAG_ORG
-
-// The HTTPS Server comes in a separate namespace. For easier use, include it here.
-using namespace httpsserver;
 
 // Create an SSL certificate object from the files included above ...
 SSLCert cert = SSLCert(
@@ -61,22 +59,8 @@ HTTPSServer secureServer = HTTPSServer(&cert, 443, MAX_CLIENTS);
 void handleRoot(HTTPRequest * req, HTTPResponse * res);
 void handle404(HTTPRequest * req, HTTPResponse * res);
 
-// As websockets are more complex, they need a custom class that is derived from WebsocketHandler
-class ChatHandler : public WebsocketHandler {
-public:
-  // This method is called by the webserver to instantiate a new handler for each
-  // client that connects to the websocket endpoint
-  static WebsocketHandler* create();
-
-  // This method is called when a message arrives
-  void onMessage(WebsocketInputStreambuf * input);
-
-  // Handler function on connection close
-  void onClose();
-};
-
 // Simple array to store the active clients:
-ChatHandler* activeClients[MAX_CLIENTS];
+WsHandler* activeClients[MAX_CLIENTS];
 
 void setup() {
   // Initialize the slots
@@ -120,7 +104,7 @@ void setup() {
   // The websocket handler can be linked to the server by using a WebsocketNode:
   // (Note that the standard defines GET as the only allowed method here,
   // so you do not need to pass it explicitly)
-  WebsocketNode * chatNode = new WebsocketNode("/chat", &ChatHandler::create);
+  WebsocketNode * chatNode = new WebsocketNode("/chat", &WsHandler::create);
 
   // Adding the node to the server works in the same way as for all other nodes
   secureServer.registerNode(chatNode);
@@ -164,47 +148,6 @@ void handle404(HTTPRequest * req, HTTPResponse * res) {
   res->println("<body><h1>404 Not Found</h1><p>The requested resource was not found on this server.</p></body>");
   res->println("</html>");
 }
-
-// In the create function of the handler, we create a new Handler and keep track
-// of it using the activeClients array
-WebsocketHandler * ChatHandler::create() {
-  Serial.println("Creating new chat client!");
-  ChatHandler * handler = new ChatHandler();
-  for(int i = 0; i < MAX_CLIENTS; i++) {
-    if (activeClients[i] == nullptr) {
-      activeClients[i] = handler;
-      break;
-    }
-  }
-  return handler;
-}
-
-// When the websocket is closing, we remove the client from the array
-void ChatHandler::onClose() {
-  for(int i = 0; i < MAX_CLIENTS; i++) {
-    if (activeClients[i] == this) {
-      activeClients[i] = nullptr;
-    }
-  }
-}
-
-// Finally, passing messages around. If we receive something, we send it to all
-// other clients
-void ChatHandler::onMessage(WebsocketInputStreambuf * inbuf) {
-  // Get the input message
-  std::ostringstream ss;
-  std::string msg;
-  ss << inbuf;
-  msg = ss.str();
-
-  // Send it back to every client
-  for(int i = 0; i < MAX_CLIENTS; i++) {
-    if (activeClients[i] != nullptr) {
-      activeClients[i]->send(msg, SEND_TYPE_TEXT);
-    }
-  }
-}
-
 
 
 // The following HTML code will present the chat interface.

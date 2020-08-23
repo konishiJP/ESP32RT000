@@ -4,4 +4,7 @@ esp32_https_server-1.0.0
 Websocket-Chat
 
 
-アクセスポイント可
+アクセスポイント化
+
+
+別ファイル化
