@@ -1,24 +1,14 @@
-/**
- * Example for the ESP32 HTTP(S) Webserver
- *
- * IMPORTANT NOTE:
- * To run this script, you need to
- *  1) Enter your WiFi SSID and PSK below this comment
- *  2) Make sure to have certificate data available. You will find a
- *     shell script and instructions to do so in the library folder
- *     under extras/
- *
- * This script will install an HTTPS Server on your ESP32 with the following
- * functionalities:
- *  - Show a chat interface on the root node /
- *  - Use a websocket to allow multiple clients to pass messages to each other
- */
+#define FLAG_ORG 0
+#define FLAG_DNS 0
 
 #include <sstream>
 
+#if FLAG_ORG
 // TODO: Configure your WiFi here
 #define WIFI_SSID "<your ssid goes here>"
 #define WIFI_PSK  "<your pre-shared key goes here>"
+#else   //FLAG_ORG
+#endif  //FLAG_ORG
 
 // Max clients to be connected to the chat
 #define MAX_CLIENTS 4
@@ -35,7 +25,20 @@
 #include <SSLCert.hpp>
 #include <HTTPRequest.hpp>
 #include <HTTPResponse.hpp>
-#include <WebsocketHandler.hpp>
+
+#if FLAG_DNS
+#include <DNSServer.h>
+const byte DNS_PORT = 53;
+DNSServer dnsServer;
+#endif
+
+#if FLAG_ORG
+#else   //FLAG_ORG
+const char ssid[] = "test00";
+const char pass[] = "12345678";
+const IPAddress ip(192,168,48,1);
+const IPAddress subnet(255,255,255,0);
+#endif  //FLAG_ORG
 
 // The HTTPS Server comes in a separate namespace. For easier use, include it here.
 using namespace httpsserver;
@@ -84,6 +87,7 @@ void setup() {
 
   // Connect to WiFi
   Serial.println("Setting up WiFi");
+#if FLAG_ORG
   WiFi.begin(WIFI_SSID, WIFI_PSK);
   while (WiFi.status() != WL_CONNECTED) {
     Serial.print(".");
@@ -91,6 +95,19 @@ void setup() {
   }
   Serial.print("Connected. IP=");
   Serial.println(WiFi.localIP());
+#else   //FLAG_ORG
+  WiFi.softAP(ssid,pass);
+  delay(100);
+  WiFi.softAPConfig(ip,ip,subnet);
+
+  IPAddress myIP = WiFi.softAPIP();
+  Serial.print("Connected. IP=");
+  Serial.println(myIP);
+#endif  //FLAG_ORG
+
+#if FLAG_DNS
+  //dnsServer.start(DNS_PORT, "*", ip);
+#endif
 
   // For every resource available on the server, we need to create a ResourceNode
   // The ResourceNode links URL and HTTP method to a handler function

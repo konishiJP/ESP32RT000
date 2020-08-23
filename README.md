@@ -2,3 +2,6 @@
 
 esp32_https_server-1.0.0
 Websocket-Chat
+
+
+アクセスポイント可
